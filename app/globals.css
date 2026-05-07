@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== NSOffice.AI tokens (fonts pulled from /public/fonts) ============= */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100; src: url("/fonts/DMSans-Thin.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 300; src: url("/fonts/DMSans-Light.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400; src: url("/fonts/DMSans-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: italic;  font-weight: 400; src: url("/fonts/DMSans-Italic.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 500; src: url("/fonts/DMSans-Medium.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: italic;  font-weight: 500; src: url("/fonts/DMSans-MediumItalic.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 600; src: url("/fonts/DMSans-SemiBold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 700; src: url("/fonts/DMSans-Bold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: italic;  font-weight: 700; src: url("/fonts/DMSans-BoldItalic.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 800; src: url("/fonts/DMSans-ExtraBold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 900; src: url("/fonts/DMSans-Black.ttf") format("truetype"); font-display: swap; }
+@import url("https://rsms.me/inter/inter.css");
+
+:root {
+  --brand-black: #2F343E; --brand-white: #F3F3F3;
+  --grey-1: #5A6579; --grey-2: #9CA6BA; --grey-3: #BDC3D0;
+  --ink-900: #1A1D24;
+  --visionary: #B7E9D5; --calm: #DDD0FF; --human-first: #FFD7CC; --secure: #90B9FF; --intelligent: #E6F280;
+  --accent: #4E62ED; --accent-hover: #3F51D8; --accent-press: #2F3FB0; --accent-soft: #E5EAFF; --accent-deck: #4164FD;
+}
+
+html, body {
+  font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #FFFFFF;
+  color: #2F343E;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.font-product, .ui { font-family: "Inter", "DM Sans", ui-sans-serif, system-ui, sans-serif; font-feature-settings: "cv11","ss01","ss03"; }
+
+.eyebrow {
+  font-weight: 600; font-size: 11px; line-height: 1; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #5A6579;
+}
+
+.h-display {
+  font-family: "DM Sans"; font-weight: 400; line-height: 1.02;
+  letter-spacing: -0.025em; color: #1A1D24;
+  font-size: clamp(40px, 6vw, 76px);
+}
+
+/* Subtle grid backdrop for hero */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(47,52,62,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(47,52,62,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Soft glow halo behind primary CTAs / hero brand bubble */
+.halo {
+  position: relative;
+}
+.halo::before {
+  content: "";
+  position: absolute; inset: -40px;
+  background: radial-gradient(closest-side, rgba(78,98,237,0.18), rgba(78,98,237,0) 70%);
+  filter: blur(20px);
+  z-index: -1;
+}
+
+/* Pill */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 9999px;
+  background: #F3F3F3; color: #2F343E;
+  font-size: 12px; font-weight: 500;
+  border: 1px solid #E4E7EC;
+}
+
+/* Cards */
+.card {
+  background: #FFFFFF; border: 1px solid #E4E7EC; border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(47,52,62,0.04);
+}
+
+/* Focus ring matches NSOffice.AI brand */
+:where(a,button,input,select,textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(65,100,253,0.18);
+  border-radius: 8px;
+}
+
+/* Loader dots */
+@keyframes pulseDot { 0%,80%,100% { opacity: .25 } 40% { opacity: 1 } }
+.dot { display:inline-block; width:6px; height:6px; border-radius:9999px; background:#4E62ED; margin-right:4px; animation: pulseDot 1.2s infinite ease-in-out; }
+.dot:nth-child(2) { animation-delay: .15s }
+.dot:nth-child(3) { animation-delay: .3s }
+
+/* Marquee shimmer for hero */
+@keyframes shimmer {
+  0% { background-position: 0% 50% }
+  100% { background-position: 200% 50% }
+}
+.shimmer-text {
+  background: linear-gradient(110deg, #2F343E 0%, #4E62ED 25%, #2F343E 50%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 8s linear infinite;
+}
+
+/* scroll polish */
+html { scroll-behavior: smooth; }
+::selection { background: #E5EAFF; color: #2F3FB0; }

@@ -1,0 +1,322 @@
+/* =====================================================================
+   NSOffice.AI — Design Tokens
+   Colors, type, spacing, radii, shadows, motion.
+   ---------------------------------------------------------------------
+   Brand fonts per guidelines:
+     - Funnel Sans / Funnel Display (brand/marketing)  → substituted with DM Sans *
+     - Inter (product UI)
+   * DM Sans was supplied by the client as the working font in this kit.
+     Funnel Sans is a geometric grotesque; DM Sans is its closest
+     production-ready neighbour — ship DM Sans until real Funnel Sans
+     files arrive, then swap the @font-face src paths.
+   ===================================================================== */
+
+/* ---------- Fonts ------------------------------------------------------ */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 100; src: url("fonts/DMSans-Thin.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 300; src: url("fonts/DMSans-Light.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400; src: url("fonts/DMSans-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: italic; font-weight: 400; src: url("fonts/DMSans-Italic.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 500; src: url("fonts/DMSans-Medium.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: italic; font-weight: 500; src: url("fonts/DMSans-MediumItalic.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 600; src: url("fonts/DMSans-SemiBold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 700; src: url("fonts/DMSans-Bold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: italic; font-weight: 700; src: url("fonts/DMSans-BoldItalic.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 800; src: url("fonts/DMSans-ExtraBold.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 900; src: url("fonts/DMSans-Black.ttf") format("truetype"); font-display: swap; }
+
+/* Inter is the *product* typeface per the brand deck.
+   Pulled from a CDN so product UIs look right without adding a dozen files. */
+@import url("https://rsms.me/inter/inter.css");
+
+:root {
+  /* ---------- Primary palette -------------------------------------- */
+  /* "The brand black — a thoughtful pause." */
+  --brand-black:        #2F343E;
+  --brand-white:        #F3F3F3;
+
+  /* Greys, 1 = darkest, 3 = lightest */
+  --grey-1:             #5A6579;
+  --grey-2:             #9CA6BA;
+  --grey-3:             #BDC3D0;
+
+  /* Pure whites / near-blacks for UI surfaces */
+  --pure-white:         #FFFFFF;
+  --ink-900:            #1A1D24;  /* slightly deeper than brand-black, for big type */
+
+  /* ---------- Secondary (currency) palette ------------------------- */
+  /* Used at interaction points, motion moments, highlights — never everywhere. */
+  --visionary:          #B7E9D5;   /* mountain / mint */
+  --calm:               #DDD0FF;   /* sky / lavender */
+  --human-first:        #FFD7CC;   /* warmth / peach */
+  --secure:             #90B9FF;   /* water / blue */
+  --intelligent:        #E6F280;   /* lime / spark */
+
+  /* ---------- Accent ------------------------------------------------ */
+  /* The only saturated blue. Emphasis only.
+     Live site uses #4E62ED; brand deck specifies #4164FD. Going with
+     the live value so prototypes match the shipped site. */
+  --accent:             #4E62ED;
+  --accent-hover:       #3F51D8;
+  --accent-press:       #2F3FB0;
+  --accent-soft:        #E5EAFF;
+  --accent-deck:        #4164FD; /* brand-deck accent, kept for reference */
+  --secondary-ink:      #101828; /* site secondary / near-black for heavy headlines */
+
+  /* ---------- Semantic surfaces (light) ---------------------------- */
+  --bg:                 #FFFFFF;
+  --bg-elevated:        #FFFFFF;
+  --bg-muted:           #F3F3F3;   /* = brand-white */
+  --bg-sunken:          #ECEEF2;
+  --bg-inverse:         #2F343E;   /* = brand-black */
+
+  --fg:                 #2F343E;   /* primary text */
+  --fg-muted:           #5A6579;   /* = grey-1 — secondary text */
+  --fg-subtle:          #9CA6BA;   /* = grey-2 — tertiary / captions */
+  --fg-disabled:        #BDC3D0;   /* = grey-3 */
+  --fg-inverse:         #F3F3F3;
+  --fg-accent:          #4164FD;
+
+  --border:             #E4E7EC;
+  --border-strong:      #BDC3D0;
+  --border-subtle:      #F1F2F5;
+  --divider:            #E4E7EC;
+
+  /* ---------- Feedback (derived from the currency palette) --------- */
+  --success-bg:         #B7E9D5;
+  --success-fg:         #1F5C46;
+  --info-bg:            #90B9FF;
+  --info-fg:            #143A7A;
+  --warn-bg:            #FFD7CC;
+  --warn-fg:            #7A3822;
+  --danger-bg:          #FFD1D1;
+  --danger-fg:          #8B1F1F;
+
+  /* ---------- Typography ------------------------------------------- */
+  /* Brand / marketing — geometric, spacious. */
+  --font-brand:         "DM Sans", "Funnel Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display:       "DM Sans", "Funnel Display", ui-sans-serif, system-ui, sans-serif;
+  /* Product UI — per brand deck. */
+  --font-product:       "Inter", "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:          ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Weights */
+  --w-light:    300;
+  --w-regular:  400;
+  --w-medium:   500;
+  --w-semibold: 600;
+  --w-bold:     700;
+
+  /* Display / headline sizes — from brand deck (page-size values).
+     Converted to sensible on-screen defaults; keep ratios. */
+  --fs-display-1:   clamp(56px, 8vw, 110px);   /* Headline 1 / brand */
+  --fs-display-2:   clamp(44px, 6vw, 84px);    /* Headline 2 / brand, light */
+  --fs-h1:          48px;
+  --fs-h2:          36px;
+  --fs-h3:          28px;
+  --fs-h4:          22px;
+  --fs-title:       20px;   /* sub-text title — 25pt in deck */
+  --fs-subhead:     clamp(22px, 2.4vw, 32px);
+  --fs-body-lg:     18px;
+  --fs-body:        16px;
+  --fs-body-sm:     14px;
+  --fs-caption:     12px;
+  --fs-micro:       11px;
+
+  /* Line-heights */
+  --lh-tight:   1.05;
+  --lh-snug:    1.2;
+  --lh-normal:  1.45;
+  --lh-relaxed: 1.6;
+
+  /* Letter-spacing — DM Sans feels best slightly tightened at display sizes */
+  --ls-display: -0.02em;
+  --ls-head:    -0.01em;
+  --ls-body:    0;
+  --ls-label:   0.08em;  /* all-caps labels / eyebrows */
+
+  /* ---------- Spacing (8-pt grid — per scraped brand config) ------- */
+  --space-0:   0px;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+  --space-24:  96px;
+  --space-32:  128px;
+
+  /* ---------- Radii ------------------------------------------------- */
+  /* Deck: sharp for small; "slightly rounded" for large content containers. */
+  --radius-0:   0px;
+  --radius-xs:  4px;
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  24px;
+  --radius-2xl: 32px;
+  --radius-pill: 9999px;   /* the "bar" — core brand shape */
+
+  /* ---------- Shadows ---------------------------------------------- */
+  /* Soft, cool-tinted. Nothing hard-edged. */
+  --shadow-xs:  0 1px 2px rgba(47,52,62,0.05);
+  --shadow-sm:  0 2px 6px rgba(47,52,62,0.06), 0 1px 2px rgba(47,52,62,0.04);
+  --shadow-md:  0 10px 24px -8px rgba(47,52,62,0.12), 0 2px 6px rgba(47,52,62,0.06);
+  --shadow-lg:  0 24px 48px -16px rgba(47,52,62,0.18), 0 4px 10px rgba(47,52,62,0.06);
+  --shadow-xl:  0 40px 80px -24px rgba(47,52,62,0.22);
+  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.6);
+  --shadow-focus: 0 0 0 4px rgba(65,100,253,0.18);
+
+  /* ---------- Motion ------------------------------------------------ */
+  --ease-standard: cubic-bezier(0.2, 0.0, 0.0, 1);     /* calm, decelerating */
+  --ease-emphasized: cubic-bezier(0.2, 0.0, 0.0, 1);
+  --ease-in:       cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-out:      cubic-bezier(0, 0, 0.2, 1);
+  --ease-inout:    cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast:   120ms;
+  --dur-base:   200ms;
+  --dur-slow:   320ms;
+  --dur-ambient: 600ms;
+
+  /* ---------- Gradients (brand-signifier only) --------------------- */
+  --gradient-brand: linear-gradient(110deg, #FFD7CC 0%, #DDD0FF 28%, #90B9FF 56%, #B7E9D5 80%, #E6F280 100%);
+  --gradient-secure: linear-gradient(135deg, #90B9FF 0%, #DDD0FF 100%);
+  --gradient-calm:   linear-gradient(135deg, #DDD0FF 0%, #FFD7CC 100%);
+  --gradient-accent: linear-gradient(135deg, #4164FD 0%, #90B9FF 100%);
+
+  /* ---------- Layout ------------------------------------------------ */
+  --container-sm:  640px;
+  --container-md:  960px;
+  --container-lg:  1200px;
+  --container-xl:  1440px;
+  --z-base:    1;
+  --z-raised:  10;
+  --z-sticky:  100;
+  --z-overlay: 1000;
+  --z-toast:   2000;
+}
+
+/* =====================================================================
+   Semantic element styles — drop in by setting font-family + sizes.
+   ===================================================================== */
+
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+body {
+  font-family: var(--font-brand);
+  font-size: var(--fs-body);
+  line-height: var(--lh-normal);
+  color: var(--fg);
+  background: var(--bg);
+}
+
+/* Marketing / brand headlines — DM Sans (Funnel Sans sub), tight tracking. */
+.h-display,
+h1.display {
+  font-family: var(--font-display);
+  font-weight: var(--w-regular);
+  font-size: var(--fs-display-1);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-display);
+  color: var(--fg);
+}
+.h-display--light {
+  font-weight: var(--w-light);
+}
+
+h1, .h1 {
+  font-family: var(--font-brand);
+  font-weight: var(--w-regular);
+  font-size: var(--fs-h1);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-head);
+  color: var(--fg);
+  margin: 0;
+}
+h2, .h2 {
+  font-family: var(--font-brand);
+  font-weight: var(--w-semibold);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--ls-head);
+  margin: 0;
+}
+h3, .h3 {
+  font-family: var(--font-brand);
+  font-weight: var(--w-semibold);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-snug);
+  margin: 0;
+}
+h4, .h4 {
+  font-family: var(--font-brand);
+  font-weight: var(--w-medium);
+  font-size: var(--fs-h4);
+  line-height: var(--lh-snug);
+  margin: 0;
+}
+.subhead {
+  font-family: var(--font-brand);
+  font-weight: var(--w-semibold);
+  font-size: var(--fs-subhead);
+  line-height: var(--lh-snug);
+  color: var(--fg);
+}
+.title {
+  font-family: var(--font-brand);
+  font-weight: var(--w-medium);
+  font-size: var(--fs-title);
+  line-height: var(--lh-snug);
+}
+
+p, .body {
+  font-family: var(--font-brand);
+  font-weight: var(--w-regular);
+  font-size: var(--fs-body);
+  line-height: var(--lh-relaxed);
+  color: var(--fg);
+  text-wrap: pretty;
+}
+.body-lg { font-size: var(--fs-body-lg); }
+.body-sm { font-size: var(--fs-body-sm); color: var(--fg-muted); }
+.caption  { font-size: var(--fs-caption); color: var(--fg-subtle); letter-spacing: 0.01em; }
+
+.eyebrow,
+.label-caps {
+  font-family: var(--font-brand);
+  font-weight: var(--w-semibold);
+  font-size: var(--fs-caption);
+  line-height: 1;
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+/* Accent typography — Funnel Display equivalent: use sparingly, for highlights */
+.accent-type {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: var(--w-regular);
+  color: var(--fg);
+}
+
+/* Product UI type — Inter */
+.product, .ui {
+  font-family: var(--font-product);
+}
+
+code, kbd, pre, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* Focus — brand-accent ring, always */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--radius-sm);
+}
