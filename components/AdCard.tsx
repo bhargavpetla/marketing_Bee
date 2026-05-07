@@ -54,14 +54,19 @@ export default function AdCard({ ad }: { ad: Ad }) {
               else setAllFailed(true);
             }}
           />
-        ) : embed ? (
-          <iframe
-            src={embed}
-            className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin"
-            loading="lazy"
-            title="ad preview"
-          />
+        ) : embed && ad.ctaUrl ? (
+          // Google video ads return a JSONP previewUrl that can't be iframed directly.
+          // Show a styled card with click-through to the Google Ads Transparency listing.
+          <a
+            href={ad.ctaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-ink-900 via-slate-800 to-accent text-white gap-3 hover:opacity-90 transition"
+          >
+            <div className="w-14 h-14 rounded-pill bg-white/10 backdrop-blur flex items-center justify-center text-2xl">▶</div>
+            <div className="text-[13px] font-semibold">Video ad</div>
+            <div className="text-[11px] opacity-70 underline">Open on Google →</div>
+          </a>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-fg-subtle text-sm">no creative</div>
         )}

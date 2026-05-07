@@ -25,6 +25,7 @@ function open() {
       status_msg TEXT,
       progress INTEGER NOT NULL DEFAULT 0,
       decisions_json TEXT NOT NULL DEFAULT '{}',
+      options_json TEXT NOT NULL DEFAULT '{}',
       competitors_json TEXT NOT NULL DEFAULT '[]',
       cross_json TEXT,
       error TEXT,
@@ -77,6 +78,7 @@ function open() {
     "ALTER TABLE runs ADD COLUMN progress INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE runs ADD COLUMN decisions_json TEXT NOT NULL DEFAULT '{}'",
     "ALTER TABLE ads ADD COLUMN embed_urls TEXT NOT NULL DEFAULT '[]'",
+    "ALTER TABLE runs ADD COLUMN options_json TEXT NOT NULL DEFAULT '{}'",
   ]) {
     try { db.exec(stmt); } catch { /* column exists, ignore */ }
   }

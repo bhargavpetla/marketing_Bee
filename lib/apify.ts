@@ -226,51 +226,122 @@ type Logger = (level: "info" | "warn" | "error", msg: string) => void;
 
 export async function scrapeMeta(
   competitor: string,
-  opts?: { country?: string; max?: number; log?: Logger },
+  opts?: {
+    country?: string;
+    max?: number;
+    log?: Logger;
+    dateFrom?: string;
+    dateTo?: string;
+    formats?: ("image" | "video" | "text")[];
+  },
 ): Promise<ScrapedAd[]> {
   const country = opts?.country || "IN";
   const max = opts?.max ?? 25;
+  const formats = opts?.formats || ["image", "video", "text"];
 
-  const searchUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${country}&q=${encodeURIComponent(
-    competitor,
-  )}&search_type=keyword_unordered&media_type=all`;
+  // FB Ad Library only accepts one media_type value; collapse to the most-specific.
+  const mediaType =
+    formats.length === 1 && formats[0] === "image"
+      ? "image"
+      : formats.length === 1 && formats[0] === "video"
+      ? "video"
+      : "all";
+  const params = new URLSearchParams({
+    active_status: "all",
+    ad_type: "all",
+    country,
+    q: competitor,
+    search_type: "keyword_unordered",
+    media_type: mediaType,
+  });
+  if (opts?.dateFrom) params.set("start_date[min]", opts.dateFrom);
+  if (opts?.dateTo) params.set("start_date[max]", opts.dateTo);
+  const searchUrl = `https://www.facebook.com/ads/library/?${params.toString()}`;
 
   const run = await client().actor(META_ACTOR).call(
     {
       startUrls: [{ url: searchUrl }],
-      resultsLimit: max,
+      resultsLimit: max * 2, // ask for more so the brand-match filter still leaves us enough
       proxyConfiguration: { useApifyProxy: true },
     } as any,
     { waitSecs: 300 },
   );
-  const { items } = await client().dataset(run.defaultDatasetId).listItems({ limit: max });
+  const { items } = await client().dataset(run.defaultDatasetId).listItems({ limit: max * 2 });
+
+  // Keyword-search results can include unrelated advertisers whose copy mentions
+  // the brand. Keep only ads whose pageName plausibly matches the competitor.
+  const target = brandTokens(competitor);
+  const filtered = items.filter((it: any) => {
+    const page = (it.pageName || it.snapshot?.page_name || "").toString();
+    return matchesBrand(page, target);
+  });
   if (opts?.log) {
-    if (items.length === 0)
+    if (items.length === 0) {
       opts.log("warn", `Meta actor ${META_ACTOR} returned 0 items for ${competitor}; apify run=${run.id}`);
-    else opts.log("info", `Meta actor returned ${items.length} raw items; keys=${Object.keys(items[0] as object).slice(0, 8).join(",")}`);
+    } else {
+      opts.log(
+        "info",
+        `Meta actor returned ${items.length} raw items, ${filtered.length} matched ${competitor}; keys=${Object.keys(items[0] as object).slice(0, 8).join(",")}`,
+      );
+    }
   }
-  return finalizeAds(items, competitor, "meta", normalizeMeta);
+  return finalizeAds(filtered.slice(0, max), competitor, "meta", normalizeMeta);
+}
+
+function brandTokens(brand: string): Set<string> {
+  return new Set(
+    brand
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 3),
+  );
+}
+function matchesBrand(pageName: string, brandTokenSet: Set<string>): boolean {
+  if (!pageName) return false;
+  const tokens = pageName
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3);
+  // Match if any 3+ char brand token appears in the page name. Accepts "Foxtale Skincare", "DotandKey", etc.
+  for (const t of brandTokenSet) {
+    if (tokens.some((p) => p === t || p.includes(t) || t.includes(p))) return true;
+  }
+  return false;
 }
 
 export async function scrapeGoogle(
   competitor: string,
-  opts?: { region?: string; max?: number; log?: Logger; domain?: string | null },
+  opts?: {
+    region?: string;
+    max?: number;
+    log?: Logger;
+    domain?: string | null;
+    dateFrom?: string;
+    dateTo?: string;
+    formats?: ("image" | "video" | "text")[];
+  },
 ): Promise<ScrapedAd[]> {
   const region = opts?.region || "IN";
   const max = opts?.max ?? 25;
+  const formats = opts?.formats || ["image", "video", "text"];
 
   // Schema for the Google Ads Transparency Center actor (auto-detects keyword/domain/advertiserId).
   // Prefer searching by domain when we know it — yields exact-advertiser matches.
-  // Fall back to brand keyword.
   const searchQuery = opts?.domain && opts.domain.includes(".") ? opts.domain : competitor;
   const input: any = {
     searchQuery,
     maxResults: max,
     region,
   };
+  if (opts?.dateFrom) input.dateFrom = opts.dateFrom;
+  if (opts?.dateTo) input.dateTo = opts.dateTo;
 
   const run = await client().actor(GOOGLE_ACTOR).call(input, { waitSecs: 300 });
-  const { items } = await client().dataset(run.defaultDatasetId).listItems({ limit: max });
+  const { items: rawItems } = await client().dataset(run.defaultDatasetId).listItems({ limit: max });
+  // Filter by format client-side — actor doesn't accept a format param.
+  const items = rawItems.filter((it: any) =>
+    formats.includes(((it.adFormat || "image") as string).toLowerCase() as any),
+  );
 
   // Diagnostic surface — if the actor ran but produced 0 items, capture the run id so we can
   // open it on Apify and inspect the input schema. If items returned but normalize zeroes them,

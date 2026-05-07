@@ -6,6 +6,8 @@ import type { Competitor } from "@/lib/types";
 
 type Phase = "input" | "discovering" | "review" | "starting";
 
+type AdFormat = "image" | "video" | "text";
+
 export default function StartFlow({ defaultBrand = "Pink Foundry" }: { defaultBrand?: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("input");
@@ -13,6 +15,10 @@ export default function StartFlow({ defaultBrand = "Pink Foundry" }: { defaultBr
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [adding, setAdding] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [lookbackMonths, setLookbackMonths] = useState<number>(6);
+  const [formats, setFormats] = useState<AdFormat[]>(["image", "video", "text"]);
+  const toggleFormat = (f: AdFormat) =>
+    setFormats((cur) => (cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f]));
 
   async function discover() {
     if (!brand.trim()) return;
@@ -42,7 +48,14 @@ export default function StartFlow({ defaultBrand = "Pink Foundry" }: { defaultBr
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand, competitors }),
+        body: JSON.stringify({
+          brand,
+          competitors,
+          options: {
+            lookbackMonths,
+            formats: formats.length ? formats : ["image", "video", "text"],
+          },
+        }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "could not start run");
@@ -106,7 +119,62 @@ export default function StartFlow({ defaultBrand = "Pink Foundry" }: { defaultBr
               className="mt-2 w-full font-product text-[20px] tracking-tight px-5 h-14 rounded-md border border-border bg-white focus:border-accent transition outline-none"
             />
           </label>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          {/* Lookback + formats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+            <div>
+              <span className="text-[12px] uppercase tracking-[0.12em] text-fg-muted font-semibold">Look back</span>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[
+                  { v: 1, label: "1 month" },
+                  { v: 3, label: "3 months" },
+                  { v: 6, label: "6 months" },
+                  { v: 12, label: "1 year" },
+                  { v: 24, label: "2 years" },
+                ].map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setLookbackMonths(opt.v)}
+                    className={`h-9 px-3.5 rounded-pill text-[13px] border transition ${
+                      lookbackMonths === opt.v
+                        ? "bg-ink-900 text-white border-ink-900"
+                        : "bg-white text-ink-900 border-border hover:border-ink-900/40"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <span className="text-[12px] uppercase tracking-[0.12em] text-fg-muted font-semibold">Ad formats</span>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {([
+                  { v: "image", label: "📷 Photo / static" },
+                  { v: "video", label: "🎬 Video" },
+                  { v: "text", label: "📝 Text / search" },
+                ] as { v: AdFormat; label: string }[]).map((opt) => {
+                  const on = formats.includes(opt.v);
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => toggleFormat(opt.v)}
+                      className={`h-9 px-3.5 rounded-pill text-[13px] border transition ${
+                        on
+                          ? "bg-accent-soft text-accent border-accent/40"
+                          : "bg-white text-fg-muted border-border hover:border-accent/40"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-3">
             <button
               onClick={discover}
               className="h-12 px-6 rounded-pill bg-ink-900 text-white text-[15px] font-medium hover:bg-black transition"

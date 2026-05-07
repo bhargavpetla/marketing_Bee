@@ -61,6 +61,13 @@ export type CrossAnalysis = {
   };
 };
 
+export type RunOptions = {
+  /** how far back to look, in months. 1, 3, 6, 12, 24. default 6. */
+  lookbackMonths?: number;
+  /** which ad formats to keep: "image" | "video" | "text" | "all". default "all". */
+  formats?: ("image" | "video" | "text")[];
+};
+
 export type RunStatus =
   | "created"
   | "discovering"

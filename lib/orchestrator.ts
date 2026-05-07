@@ -2,7 +2,7 @@ import { getDb, logEvent, setRunStatus, setRunProgress } from "./db";
 import { scrapeMeta, scrapeGoogle } from "./apify";
 import { askClaudeJSON } from "./claude";
 import { BATCH_SYSTEM, batchUser, DISCOVER_SYSTEM, discoverUser } from "./prompts";
-import type { Competitor, CrossAnalysis, ScrapedAd } from "./types";
+import type { Competitor, CrossAnalysis, RunOptions, ScrapedAd } from "./types";
 
 export async function discoverCompetitors(brand: string): Promise<Competitor[]> {
   const out = await askClaudeJSON<{ competitors: Competitor[] }>({
@@ -26,6 +26,12 @@ export async function runPipeline(runId: string) {
   if (!row) throw new Error("run not found");
   const competitors: Competitor[] = JSON.parse(row.competitors_json);
   const brand: string = row.brand;
+  const options: RunOptions = row.options_json ? JSON.parse(row.options_json) : {};
+  const lookbackMonths = options.lookbackMonths || 6;
+  const formats: ("image" | "video" | "text")[] =
+    options.formats && options.formats.length ? options.formats : ["image", "video", "text"];
+  const dateFrom = monthsAgoISO(lookbackMonths);
+  const dateTo = todayISO();
 
   // ---- 1) SCRAPE ----------------------------------------------------------
   setRunStatus(runId, "scraping", `Scraping ads for ${competitors.length} competitors`);
@@ -44,7 +50,7 @@ export async function runPipeline(runId: string) {
     const log = (level: "info" | "warn" | "error", msg: string) => logEvent(runId, level, msg);
     try {
       logEvent(runId, "info", `Meta scrape → ${c.name}`);
-      const m = await scrapeMeta(c.name, { country: "IN", max: 18, log });
+      const m = await scrapeMeta(c.name, { country: "IN", max: 18, log, dateFrom, dateTo, formats });
       got.push(...m);
       logEvent(runId, "info", `Meta scrape ← ${c.name}: ${m.length} ads`);
     } catch (e: any) {
@@ -52,7 +58,7 @@ export async function runPipeline(runId: string) {
     }
     try {
       logEvent(runId, "info", `Google scrape → ${c.name}`);
-      const g = await scrapeGoogle(c.name, { region: "IN", max: 12, log, domain: c.domain || null });
+      const g = await scrapeGoogle(c.name, { region: "IN", max: 12, log, domain: c.domain || null, dateFrom, dateTo, formats });
       got.push(...g);
       logEvent(runId, "info", `Google scrape ← ${c.name}: ${g.length} ads`);
     } catch (e: any) {
@@ -135,6 +141,15 @@ export async function runPipeline(runId: string) {
   );
   setRunProgress(runId, 100, `Done — ${ads.length} ads across ${competitors.length} brands`);
   setRunStatus(runId, "complete", `Done — ${ads.length} ads analysed across ${competitors.length} brands`);
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function monthsAgoISO(months: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString().slice(0, 10);
 }
 
 async function pool<T>(items: T[], conc: number, worker: (t: T) => Promise<void>) {
