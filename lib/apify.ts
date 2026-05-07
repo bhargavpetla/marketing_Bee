@@ -13,8 +13,14 @@ function client() {
   return _client;
 }
 
+// Verified working actors for our use case.
+// - apify/facebook-ads-scraper respects search_type=page in the URL and returns
+//   the brand's own ads (NOT keyword-mention noise from random affiliate pages).
+//   Input shape: { startUrls: [{ url }], count }.
+// - solidcode/ads-transparency-scraper accepts { searchQuery, maxResults, region }
+//   and auto-detects domain / advertiser-id / keyword.
 const META_ACTOR = process.env.APIFY_ACTOR_META || "apify/facebook-ads-scraper";
-const GOOGLE_ACTOR = process.env.APIFY_ACTOR_GOOGLE || "apify/google-ads-transparency-scraper";
+const GOOGLE_ACTOR = process.env.APIFY_ACTOR_GOOGLE || "solidcode/ads-transparency-scraper";
 
 // SCRAPED_DIR is what we WRITE to (can be a mounted disk on Render via SCRAPED_DIR env).
 // SCRAPED_PUBLIC_PATH is what the browser uses to FETCH it. Defaults to /scraped served
@@ -259,12 +265,17 @@ export async function scrapeMeta(
     if (opts?.dateTo) p.set("start_date[max]", opts.dateTo);
     return `https://www.facebook.com/ads/library/?${p.toString()}`;
   };
-  const searchUrl = buildSearchUrl("keyword_unordered");
+  // Use search_type=page directly — the official actor returns the brand's own
+  // ads when given a page-search URL, instead of keyword-content matches.
+  const searchUrl = buildSearchUrl("page");
 
+  // apify/facebook-ads-scraper takes startUrls + count. We ask for max*2 so the
+  // brand-match filter still leaves enough after pruning.
   const run = await client().actor(META_ACTOR).call(
     {
       startUrls: [{ url: searchUrl }],
-      resultsLimit: max * 2, // ask for more so the brand-match filter still leaves us enough
+      count: max * 2,
+      resultsLimit: max * 2, // accepted by some sibling actors; harmless on this one
       proxyConfiguration: { useApifyProxy: true },
     } as any,
     { waitSecs: 300 },
@@ -277,11 +288,25 @@ export async function scrapeMeta(
   const filterByBrand = (rows: any[]) => {
     const rejected: string[] = [];
     const ok = rows.filter((it: any) => {
-      const page = (it.pageName || it.snapshot?.page_name || "").toString();
-      const url = (it.pageURL || it.pageUrl || it.snapshot?.page_profile_uri || "").toString();
-      const m = matchesBrand(page, target) || matchesBrand(url, target);
-      if (!m && page) rejected.push(page);
-      return m;
+      // Check every place the brand identity might live. Branded-content ads have
+      // the actual brand under snapshot.brandedContent.
+      const candidates = [
+        it.pageName,
+        it.snapshot?.page_name,
+        it.snapshot?.pageName,
+        it.snapshot?.brandedContent?.pageName,
+        it.snapshot?.caption,
+        it.snapshot?.linkUrl,
+        it.snapshot?.brandedContent?.pageProfileUri,
+        it.pageURL,
+        it.pageUrl,
+        it.snapshot?.page_profile_uri,
+        it.snapshot?.pageProfileUri,
+      ]
+        .filter((x: any): x is string => typeof x === "string" && x.length > 0);
+      const matched = candidates.some((c) => matchesBrand(c, target));
+      if (!matched && candidates[0]) rejected.push(String(candidates[0]));
+      return matched;
     });
     return { ok, rejected };
   };
@@ -290,41 +315,41 @@ export async function scrapeMeta(
 
   if (opts?.log) {
     if (items.length === 0) {
-      opts.log("warn", `Meta keyword search returned 0 items for ${competitor}; run=${run.id}`);
+      opts.log("warn", `Meta page search returned 0 items for ${competitor}; run=${run.id}`);
     } else {
       opts.log(
         "info",
-        `Meta keyword search: ${items.length} raw, ${filtered.length} matched ${competitor}.`,
+        `Meta page search: ${items.length} raw, ${filtered.length} matched ${competitor}.`,
       );
     }
   }
 
-  // Fallback: keyword search returned ads but none matched the brand (it picked up
-  // retailers / press / unrelated advertisers mentioning the keyword). Retry with
-  // search_type=page which returns the brand's actual page ads.
-  if (filtered.length === 0 && items.length > 0) {
+  // Fallback: page search returned nothing useful — try keyword as a last resort.
+  if (filtered.length === 0) {
     const sampleRejects = Array.from(new Set(rejected)).slice(0, 5).join(", ");
-    if (opts?.log) opts.log("warn", `Retrying with search_type=page (rejected: ${sampleRejects})`);
+    if (opts?.log)
+      opts.log("warn", `Falling back to keyword search${sampleRejects ? ` (rejected: ${sampleRejects})` : ""}`);
     try {
-      const pageRun = await client().actor(META_ACTOR).call(
+      const kwRun = await client().actor(META_ACTOR).call(
         {
-          startUrls: [{ url: buildSearchUrl("page") }],
+          startUrls: [{ url: buildSearchUrl("keyword_unordered") }],
+          count: max * 2,
           resultsLimit: max * 2,
           proxyConfiguration: { useApifyProxy: true },
         } as any,
         { waitSecs: 300 },
       );
-      const { items: pageItems } = await client().dataset(pageRun.defaultDatasetId).listItems({ limit: max * 2 });
-      const r = filterByBrand(pageItems);
+      const { items: kwItems } = await client().dataset(kwRun.defaultDatasetId).listItems({ limit: max * 2 });
+      const r = filterByBrand(kwItems);
       filtered = r.ok;
       if (opts?.log) {
         opts.log(
           "info",
-          `Meta page-search: ${pageItems.length} raw, ${filtered.length} matched ${competitor}.`,
+          `Meta keyword fallback: ${kwItems.length} raw, ${filtered.length} matched ${competitor}.`,
         );
       }
     } catch (e: any) {
-      if (opts?.log) opts.log("warn", `Meta page-search retry failed: ${e?.message || e}`);
+      if (opts?.log) opts.log("warn", `Meta keyword fallback failed: ${e?.message || e}`);
     }
   }
 
@@ -397,9 +422,26 @@ export async function scrapeGoogle(
     }
   }
   // Filter by format client-side — actor doesn't accept a format param.
-  const items = rawItems.filter((it: any) =>
+  let items = rawItems.filter((it: any) =>
     formats.includes(((it.adFormat || "image") as string).toLowerCase() as any),
   );
+
+  // Validate the advertiser actually matches the brand we asked for. Keyword
+  // searches sometimes return adjacent brands (e.g. "Minimalist" → "Minimalistic
+  // Nest Decor"). Require the advertiserName or domain to share a brand token.
+  const target = brandTokens(competitor);
+  const beforeFilter = items.length;
+  items = items.filter((it: any) => {
+    const name = String(it.advertiserName || "");
+    const url = String(it.adUrl || "");
+    return matchesBrand(name, target) || (opts?.domain ? name.toLowerCase().includes(opts.domain.split(".")[0]) : false) || matchesBrand(url, target);
+  });
+  if (opts?.log && beforeFilter !== items.length) {
+    opts.log(
+      "info",
+      `Google advertiser-name filter dropped ${beforeFilter - items.length} of ${beforeFilter} (kept ${items.length}).`,
+    );
+  }
 
   // Diagnostic surface — if the actor ran but produced 0 items, capture the run id so we can
   // open it on Apify and inspect the input schema. If items returned but normalize zeroes them,
