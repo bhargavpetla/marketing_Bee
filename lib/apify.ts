@@ -246,17 +246,20 @@ export async function scrapeMeta(
       : formats.length === 1 && formats[0] === "video"
       ? "video"
       : "all";
-  const params = new URLSearchParams({
-    active_status: "all",
-    ad_type: "all",
-    country,
-    q: competitor,
-    search_type: "keyword_unordered",
-    media_type: mediaType,
-  });
-  if (opts?.dateFrom) params.set("start_date[min]", opts.dateFrom);
-  if (opts?.dateTo) params.set("start_date[max]", opts.dateTo);
-  const searchUrl = `https://www.facebook.com/ads/library/?${params.toString()}`;
+  const buildSearchUrl = (searchType: "keyword_unordered" | "page") => {
+    const p = new URLSearchParams({
+      active_status: "all",
+      ad_type: "all",
+      country,
+      q: competitor,
+      search_type: searchType,
+      media_type: mediaType,
+    });
+    if (opts?.dateFrom) p.set("start_date[min]", opts.dateFrom);
+    if (opts?.dateTo) p.set("start_date[max]", opts.dateTo);
+    return `https://www.facebook.com/ads/library/?${p.toString()}`;
+  };
+  const searchUrl = buildSearchUrl("keyword_unordered");
 
   const run = await client().actor(META_ACTOR).call(
     {
@@ -271,20 +274,60 @@ export async function scrapeMeta(
   // Keyword-search results can include unrelated advertisers whose copy mentions
   // the brand. Keep only ads whose pageName plausibly matches the competitor.
   const target = brandTokens(competitor);
-  const filtered = items.filter((it: any) => {
-    const page = (it.pageName || it.snapshot?.page_name || "").toString();
-    return matchesBrand(page, target);
-  });
+  const filterByBrand = (rows: any[]) => {
+    const rejected: string[] = [];
+    const ok = rows.filter((it: any) => {
+      const page = (it.pageName || it.snapshot?.page_name || "").toString();
+      const url = (it.pageURL || it.pageUrl || it.snapshot?.page_profile_uri || "").toString();
+      const m = matchesBrand(page, target) || matchesBrand(url, target);
+      if (!m && page) rejected.push(page);
+      return m;
+    });
+    return { ok, rejected };
+  };
+
+  let { ok: filtered, rejected } = filterByBrand(items);
+
   if (opts?.log) {
     if (items.length === 0) {
-      opts.log("warn", `Meta actor ${META_ACTOR} returned 0 items for ${competitor}; apify run=${run.id}`);
+      opts.log("warn", `Meta keyword search returned 0 items for ${competitor}; run=${run.id}`);
     } else {
       opts.log(
         "info",
-        `Meta actor returned ${items.length} raw items, ${filtered.length} matched ${competitor}; keys=${Object.keys(items[0] as object).slice(0, 8).join(",")}`,
+        `Meta keyword search: ${items.length} raw, ${filtered.length} matched ${competitor}.`,
       );
     }
   }
+
+  // Fallback: keyword search returned ads but none matched the brand (it picked up
+  // retailers / press / unrelated advertisers mentioning the keyword). Retry with
+  // search_type=page which returns the brand's actual page ads.
+  if (filtered.length === 0 && items.length > 0) {
+    const sampleRejects = Array.from(new Set(rejected)).slice(0, 5).join(", ");
+    if (opts?.log) opts.log("warn", `Retrying with search_type=page (rejected: ${sampleRejects})`);
+    try {
+      const pageRun = await client().actor(META_ACTOR).call(
+        {
+          startUrls: [{ url: buildSearchUrl("page") }],
+          resultsLimit: max * 2,
+          proxyConfiguration: { useApifyProxy: true },
+        } as any,
+        { waitSecs: 300 },
+      );
+      const { items: pageItems } = await client().dataset(pageRun.defaultDatasetId).listItems({ limit: max * 2 });
+      const r = filterByBrand(pageItems);
+      filtered = r.ok;
+      if (opts?.log) {
+        opts.log(
+          "info",
+          `Meta page-search: ${pageItems.length} raw, ${filtered.length} matched ${competitor}.`,
+        );
+      }
+    } catch (e: any) {
+      if (opts?.log) opts.log("warn", `Meta page-search retry failed: ${e?.message || e}`);
+    }
+  }
+
   return finalizeAds(filtered.slice(0, max), competitor, "meta", normalizeMeta);
 }
 
@@ -296,15 +339,20 @@ function brandTokens(brand: string): Set<string> {
       .filter((t) => t.length >= 3),
   );
 }
-function matchesBrand(pageName: string, brandTokenSet: Set<string>): boolean {
-  if (!pageName) return false;
-  const tokens = pageName
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 3);
-  // Match if any 3+ char brand token appears in the page name. Accepts "Foxtale Skincare", "DotandKey", etc.
+function matchesBrand(haystack: string, brandTokenSet: Set<string>): boolean {
+  if (!haystack) return false;
+  const lower = haystack.toLowerCase();
+  // 1) Whole-substring check first — handles "DotandKey" matching brand "Dot & Key"
+  // because brandTokens(Dot & Key) = {dot, key} and lower might be "dotandkey".
   for (const t of brandTokenSet) {
-    if (tokens.some((p) => p === t || p.includes(t) || t.includes(p))) return true;
+    if (t.length >= 4 && lower.includes(t)) return true;
+  }
+  // 2) Tokenized overlap — handles spaces, hyphens, dots in either side.
+  const tokens = lower.split(/[^a-z0-9]+/).filter((t) => t.length >= 3);
+  for (const t of brandTokenSet) {
+    if (tokens.some((p) => p === t || (p.length >= 4 && p.includes(t)) || (t.length >= 4 && t.includes(p)))) {
+      return true;
+    }
   }
   return false;
 }
@@ -325,19 +373,29 @@ export async function scrapeGoogle(
   const max = opts?.max ?? 25;
   const formats = opts?.formats || ["image", "video", "text"];
 
-  // Schema for the Google Ads Transparency Center actor (auto-detects keyword/domain/advertiserId).
-  // Prefer searching by domain when we know it — yields exact-advertiser matches.
-  const searchQuery = opts?.domain && opts.domain.includes(".") ? opts.domain : competitor;
-  const input: any = {
-    searchQuery,
-    maxResults: max,
-    region,
-  };
-  if (opts?.dateFrom) input.dateFrom = opts.dateFrom;
-  if (opts?.dateTo) input.dateTo = opts.dateTo;
+  // Actor auto-detects keyword/domain/advertiserId. Try domain first when we know it,
+  // and if that yields 0, retry with the brand name as a keyword.
+  const queries: string[] = [];
+  if (opts?.domain && opts.domain.includes(".")) queries.push(opts.domain);
+  if (!queries.includes(competitor)) queries.push(competitor);
 
-  const run = await client().actor(GOOGLE_ACTOR).call(input, { waitSecs: 300 });
-  const { items: rawItems } = await client().dataset(run.defaultDatasetId).listItems({ limit: max });
+  let rawItems: any[] = [];
+  let lastRunId = "";
+  for (const q of queries) {
+    const input: any = { searchQuery: q, maxResults: max, region };
+    if (opts?.dateFrom) input.dateFrom = opts.dateFrom;
+    if (opts?.dateTo) input.dateTo = opts.dateTo;
+    const run = await client().actor(GOOGLE_ACTOR).call(input, { waitSecs: 300 });
+    lastRunId = run.id;
+    const { items } = await client().dataset(run.defaultDatasetId).listItems({ limit: max });
+    if (items.length > 0) {
+      rawItems = items;
+      if (opts?.log) opts.log("info", `Google searchQuery="${q}" → ${items.length} items`);
+      break;
+    } else if (opts?.log) {
+      opts.log("warn", `Google searchQuery="${q}" → 0 items (run=${run.id}); trying next fallback`);
+    }
+  }
   // Filter by format client-side — actor doesn't accept a format param.
   const items = rawItems.filter((it: any) =>
     formats.includes(((it.adFormat || "image") as string).toLowerCase() as any),
@@ -350,7 +408,7 @@ export async function scrapeGoogle(
     if (items.length === 0) {
       opts.log(
         "warn",
-        `Google actor ${GOOGLE_ACTOR} returned 0 items for ${competitor}; apify run=${run.id} (open it on apify.com to see what input shape it expected)`,
+        `Google actor ${GOOGLE_ACTOR} returned 0 items for ${competitor} (last run=${lastRunId}). Tried: ${queries.join(", ")}.`,
       );
     } else {
       const sample = items[0] as Record<string, unknown>;
