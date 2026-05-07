@@ -16,7 +16,12 @@ function client() {
 const META_ACTOR = process.env.APIFY_ACTOR_META || "apify/facebook-ads-scraper";
 const GOOGLE_ACTOR = process.env.APIFY_ACTOR_GOOGLE || "apify/google-ads-transparency-scraper";
 
-const SCRAPED_DIR = path.join(process.cwd(), "public", "scraped");
+// SCRAPED_DIR is what we WRITE to (can be a mounted disk on Render via SCRAPED_DIR env).
+// SCRAPED_PUBLIC_PATH is what the browser uses to FETCH it. Defaults to /scraped served
+// from /public, but on a mounted-disk setup SCRAPED_DIR may live outside /public — in
+// that case the /api/local-img route reads from disk instead.
+const SCRAPED_DIR = process.env.SCRAPED_DIR || path.join(process.cwd(), "public", "scraped");
+const SCRAPED_PUBLIC_PATH = process.env.SCRAPED_PUBLIC_PATH || "/scraped";
 if (!fs.existsSync(SCRAPED_DIR)) fs.mkdirSync(SCRAPED_DIR, { recursive: true });
 
 /**
@@ -61,7 +66,7 @@ async function downloadToPublic(url: string, subdir: string): Promise<string | n
     const ab = await res.arrayBuffer();
     if (ab.byteLength < 512) return null;
     fs.writeFileSync(full, Buffer.from(ab));
-    return `/scraped/${subdir}/${file}`;
+    return `${SCRAPED_PUBLIC_PATH}/${subdir}/${file}`;
   } catch {
     return null;
   }

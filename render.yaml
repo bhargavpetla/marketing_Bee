@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: pinkfoundry-radar
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: APIFY_ACTOR_META
+        value: leadsbrary/meta-ads-library-scraper
+      - key: APIFY_ACTOR_GOOGLE
+        value: solidcode/ads-transparency-scraper
+    healthCheckPath: /
+    autoDeploy: true
+    # NOTE: free plan does not include persistent disks. SQLite + scraped images
+    # will reset on each redeploy / cold start. To persist, upgrade to "starter"
+    # and uncomment the disks block below + set DATA_DIR / SCRAPED_DIR env vars.
+    # disk:
+    #   name: data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    # Then set:
+    #   DATA_DIR=/var/data
+    #   SCRAPED_DIR=/var/data/scraped
+    #   SCRAPED_PUBLIC_PATH=/api/local-img  (requires a small extra route)
